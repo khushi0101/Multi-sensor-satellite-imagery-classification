@@ -151,4 +151,16 @@ curl http://127.0.0.1:8000/stats
 - Upload a non-image file: `400 Not a valid image`.
 - Upload all 210 eval tiles, then call `/stats`: about 26 should be `needs_review`, matching the 0.9 row of the threshold table.
 
+## Built vs stubbed
 
+| Part | Status |
+|---|---|
+| Feature extraction, training, evaluation scripts | Built |
+| `POST /classify` with validation, dedupe, confidence flag, storage | Built |
+| `GET /results`, `/results/{hash}`, `/stats`, `/health` | Built (basic) |
+| Review workflow (mark a tile as reviewed or corrected) | Not built |
+| Authentication | Not built |
+| Batch upload and async processing | Not built |
+| Drift monitoring and scheduled canary checks | Not built (described in Part 3) |
+| Model rollout and re-classification of old tiles | Not built |
+| Dataset path as a command-line argument | Not built (edit `BASE_DIR`) |
