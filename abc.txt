@@ -1,0 +1,45 @@
+1. Your classifier turns out to be wrong about 30% of the time. What do you do — and how would you
+even decide whether it’s “good enough” to be useful at all?
+
+When the classifier is wrong 30% of the time:
+- Look at the confusion matrix. If they are concentrated in one or two class pairs, the model may be fully trustworthy for the other classes
+- If a threshold can separate a trustworthy subset from the rest. a model that is 70% right overall can still be very useful if, say 60% of tiles are auto accepted at 95% accuracy and the rest go to review. In my model, wrong predictions average 0.79 confidence vs 0.97 for correct ones, which makes the review flag work.
+- comparing against baselines. random guessing is 14% for 7 classes and a raw pixel classifier or the current manual process is fairer comparision. being useful means beating the alternative not being perfect.
+
+whether it is good enough is a question about cost. I would ask what the analyst does with the result, what does a wrong label cost, and how much review they can afford. From this, I would set a target like auto-accepted results must be 95% accurate, with at most 20% going to review and then check it against the threshold table.
+
+then i try to imporve the model. i would inspect the misclassified tiles, add labelled data for the confused classes, fine tune the CNN or merge classes the analyst doesn’t need to seperate.
+
+2. This service runs offline, with no one watching it live. A month after deployment, how would you
+know it’s still working correctly?
+
+- i would keep 210 labelled eval tiles on the machine and re-run them on schedule (daily and at every setup). accuracy should stay at 92.9%. if it changes something in the model, coe or environment chnaged.
+- comparing daily share of each class and average confidence against the first weeks. A sudden shift signals a data or pipeline problem.
+- a rising review rate is an early sign that incoming tiles look different from the training data.
+- request count, error rate, latency and disk space for database and stored tiles are the health signals.
+- human reviews flagged tiles as well as a small random of auto-accepted ones. corrections give real accuracy number in production.
+
+these checks write a daily summary file on the machine.
+
+3. Tiles are coming in fine, but the stored results look wrong. Walk us through how you’d find the
+cause — your actual steps, in order.
+
+- defining wrong precisely. which rows, since when and what pattern? all one class, all low confidence or onyl few tiles? checking the model version and threshold, since a changed model or threshold explains a lot immediately.
+- check the accuracy. if weights and model are fine then the problem is in the imcoming data. if not model, weights or environment has changed.
+- reproducing one bad tile offline. if the offline result differs from the stored, the difference is in how the API processes it.
+- checking input if new tiles are in same size, format color and channels.
+- checking label makking.
+- checking storage and queries
+- checking environment
+
+once i find it, i fix it and add a test that would have caught it.
+
+4. What’s the weakest part of your design, and what would break it first?
+
+- I can't see when the model is wrong in production. Some errors are confidently wrong. the model is forcd to choose one of the 7 classes even for tiles it has never seen before. these get a label sometimes with high confidence and go straight to auto_accepted.
+
+- change in input data can break it, a new region, season, or sensor, or multispectral/SAR tiles. Accuracy would drop quietly while the service reports healthy. Wouldn't be able to catch it
+
+Mitigations: watch the review rate and class distribution for drift, spot-check auto_accepted tiles, add an out-of-distribution check and validate tile format and bands strictly at ingest.
+
+- on systems side, volume would break: the endpoint is synchronous, and SQLite allows one writer at a time and storing every raw tile will fill the disk. batching, a work queue and a retention policy would address these.
