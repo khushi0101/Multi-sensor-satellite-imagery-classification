@@ -5,3 +5,5 @@ scikit-learn
 fastapi
 uvicorn
 python-multipart
+pillow
+joblib

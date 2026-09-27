@@ -6,6 +6,50 @@ A small offline service that classifies satellite tiles into 7 land-use classes 
 
 **Results on the held-out eval set (210 tiles):** 92.9% accuracy. At the default threshold of 0.9, 87.6% of tiles are auto-accepted at 97.3% accuracy, and 12.4% go to review.
 
+## Project structure
+
+```
+.
+├── classifier.py         # shared: preprocessing, ResNet18 feature extractor, batched feature extraction
+├── download_weights.py   # one-time: saves ResNet18 weights locally
+├── train.py              # trains logistic regression on cached features, saves the model
+├── evaluate.py           # accuracy, confusion matrix, confidence analysis, threshold table
+├── app.py                # FastAPI service: POST /classify + query endpoints
+├── requirements.txt
+├── design_note.docx
+└── PART3_ANSWERS.txt
+```
+
+Created when you run the scripts (not in the repo):
+
+| Path | Created by | Contents |
+|---|---|---|
+| `models/resnet18_imagenet.pth` | `download_weights.py` | Pretrained ResNet18 weights |
+| `X.npy`, `y.npy`, `classes.json` | `classifier.py` | Cached features, labels, class order |
+| `models/classifier.joblib` | `train.py` | Trained classifier + class order + model version |
+| `eval_predictions.csv` | `evaluate.py` | Per-tile eval results |
+| `results.db`, `stored_tiles/` | `app.py` | SQLite results and raw uploaded tiles |
+
+## Setup
+
+Requires Python 3.10+.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Unzip the dataset. It should look like this:
+
+```
+<dataset folder>/
+├── candidate_tiles/<ClassName>/*.png
+├── eval_set/*.png
+└── eval_labels.csv
+```
+
+**Then set `BASE_DIR` at the top of `classifier.py` to that folder.**
 
 ## How to run
 

@@ -27,16 +27,7 @@ def load_feature_extractor():
     net.eval()
     return net
 
-# net = models.resnet18(weights=None)
-# net.load_state_dict(torch.load(WEIGHTS_PATH, map_location="cpu"))
 
-# # 2. Remove the last layer (1000 ImageNet classes) -> outputs 512 features
-# net.fc = torch.nn.Identity()
-
-# # 3. Inference mode
-# net.eval()
-
-# 4. Preprocessing (must match what ResNet was trained on)
 def load_image(src):
     
     return Image.open(src)
