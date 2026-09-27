@@ -1,0 +1,67 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2820
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\froman\fcharset0 Times-Bold;\f1\froman\fcharset0 Times-Roman;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\csgray\c0;}
+\margl1440\margr1440\vieww16460\viewh18900\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b\fs24 \cf0 1. \cf2 Your classifier turns out to be wrong about 30% of the time. What do you do \'97 and how would you\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+even decide whether it\'92s \'93good enough\'94 to be useful at all?
+\f1\b0 \cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+When the classifier is wrong 30% of the time:\
+- Look at the confusion matrix. If they are concentrated in one or two class pairs, the model may be fully trustworthy for the other classes\
+- If a threshold can separate a trustworthy subset from the rest. a model that is 70% right overall can still be very useful if, say 60% of tiles are auto accepted at 95% accuracy and the rest go to review. In my model, wrong predictions average 0.79 confidence vs 0.97 for correct ones, which makes the review flag work.\
+- comparing against baselines. random guessing is 14% for 7 classes and a raw pixel classifier or the current manual process is fairer comparision. being useful means beating the alternative not being perfect.\
+\
+whether it is good enough is a question about cost. I would ask what the analyst does with the result, what does wrong label cost, and how much review can they affor? from tis i would set a target like auto accepted results must be 95% accurate, with at most 20% going to review and then check it against the threshold table.\
+\
+then i try to imporve the model. i would inspect the misclassified tiles, add labelled data for the confused classes, fine tune the CNN or merge classes the analyst doesn\'92t need to seperate.\
+\
+
+\f0\b 2. \cf2 This service runs offline, with no one watching it live. A month after deployment, how would you\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+know it\'92s still working correctly?
+\f1\b0 \cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+- i would keep 210 labelled eval tiles on the machine and re-run them on schedule (daily and at every setup). accuracy should stay at 92.9%. if it changes something in the model, coe or environment chnaged.\
+- comparing daily share of each class and average confidence against the first weeks. A sudden shift signals a data or pipeline problem.\
+- a rising review rate is an early sign that incoming tiles look different from the training data.\
+- request count, error rate, latency and disk space for database and stored tiles are the health signals.\
+- human reviews flagged tiles as well as a small random of auto-accepted ones. corrections give real accuracy number in production.\
+\
+these checks write a daily summary file on the machine.\
+\
+
+\f0\b 3. \cf2 Tiles are coming in fine, but the stored results look wrong. Walk us through how you\'92d find the\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+cause \'97 your actual steps, in order.\
+
+\f1\b0 \cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 - defining wrong precisely. which rows, since when and what pattern? all one class, all low confidence or onyl few tiles? checking the model version and threshold, since a changed model or threshold explains a lot immediately.\
+- check the accuracy. if weights and model are fine then the problem is in the imcoming data. if not model, weights or environment has changed.\
+- reproducing one bad tile offline. if the offline result differs from the stored, the difference is in how the API processes it.\
+- checking input if new tiles are in same size, format color and channels.\
+- checking label makking.\
+- checking storage and queries\
+- checking environment\
+\
+once i find it, i fix it and add a test that would have caught it.\
+\
+
+\f0\b 4. \cf2 What\'92s the weakest part of your design, and what would break it first?\
+
+\f1\b0 \cf0 \
+- I can't see when the model is wrong in production. Some errors are confidently wrong. the model is forcd to choose one of the 7 classes even for tiles it has never seen before. these get a label sometimes with high confidence and go straight to auto_accepted.\
+\
+- change in input data can break it, a new region, season, or sensor, or multispectral/SAR tiles. Accuracy would drop quietly while the service reports healthy. Wouldn't be able to catch it\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 Mitigations: watch the review rate and class distribution for drift, spot-check auto_accepted tiles, add an out-of-distribution check and validate tile format and bands strictly at ingest.\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+- on systems side, volume would break: the endpoint is synchronous, and SQLite allows one writer at a time and storing every raw tile will fill the disk. batching, a work queue and a retention policy would address these.}

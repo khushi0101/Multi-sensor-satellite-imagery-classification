@@ -1,0 +1,17 @@
+# Environment
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Generated files (recreated by the scripts)
+*.npy
+classes.json
+eval_predictions.csv
+results.db
+stored_tiles/
+models/
+
+# Dataset (don't upload the data)
+be-mlsys-assignment-dataset/
+*.zip
