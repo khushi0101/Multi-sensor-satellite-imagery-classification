@@ -1,0 +1,48 @@
+Part 3 - Problem-solving answers
+
+1. Your classifier turns out to be wrong about 30% of the time. What do you do - and how would you even decide whether it's "good enough" to be useful at all?
+
+When the classifier is wrong 30% of the time:
+- Look at the confusion matrix. If the errors are concentrated in one or two class pairs, the model may be fully trustworthy for the other classes.
+- Check whether a confidence threshold can separate a trustworthy subset from the rest. A model that is 70% right overall can still be very useful if, say, 60% of tiles are auto-accepted at 95% accuracy and the rest go to review. In my model, wrong predictions average 0.79 confidence vs 0.97 for correct ones, which is what makes the review flag work.
+- Compare against baselines. Random guessing is 14% for 7 classes, and a raw-pixel classifier or the current manual process is a fairer comparison. Being useful means beating the alternative, not being perfect.
+
+Whether it is good enough is a question about cost. I would ask what the analyst does with the result, what a wrong label costs, and how much review they can afford. From this, I would set a target like "auto-accepted results must be 95% accurate, with at most 20% going to review", and then check it against the threshold table.
+
+Then I would try to improve the model: inspect the misclassified tiles, add labelled data for the confused classes, fine-tune the CNN, or merge classes the analyst doesn't need to separate.
+
+
+2. This service runs offline, with no one watching it live. A month after deployment, how would you know it's still working correctly?
+
+- Canary set: I would keep the 210 labelled eval tiles on the machine and re-run them on a schedule (daily and at every startup). Accuracy should stay at 92.9%. If it changes, something in the model, code or environment has changed.
+- Prediction distribution: compare the daily share of each class and the average confidence against the first weeks. A sudden shift signals a data or pipeline problem.
+- Review rate: at a 0.9 threshold, about 12% of tiles should go to review. A rising review rate is an early sign that incoming tiles look different from the training data.
+- Health signals: request count, error rate, latency, and disk space for the database and stored tiles.
+- Spot checks: a human reviews the flagged tiles as well as a small random sample of auto-accepted ones. Their corrections give a real accuracy number in production.
+
+These checks write a daily summary file on the machine and flag anything outside the expected range, so whoever visits or syncs the machine sees problems immediately.
+
+
+3. Tiles are coming in fine, but the stored results look wrong. Walk us through how you'd find the cause - your actual steps, in order.
+
+1. Define "wrong" precisely. Which rows, since when, and what pattern: all one class, all low confidence, or only a few tiles? Check the model_version and threshold columns, since a changed model or threshold explains a lot immediately.
+2. Run the canary. Re-run evaluate.py on the eval set. If it still gives 92.9%, the model and weights are fine, and the problem is in the serving path or the input data. If not, the model, weights or environment has changed.
+3. Reproduce one bad tile offline. Take its stored copy from stored_tiles/ and classify it with the same code outside the API. If the offline result differs from the stored one, the difference is in how the API processes it.
+4. Check the input. Are the new tiles the same size, format, colours and number of channels as the training tiles (for example RGBA, 16-bit, or multispectral instead of RGB), and from the same sensor? Looking at a few of them often answers the question.
+5. Check preprocessing. Training, evaluation and the API must all use the same preprocessing function from classifier.py, images must be converted to RGB, and the network must be in inference mode (net.eval()). A missing net.eval() changes results depending on batch size.
+6. Check the label mapping. The model only outputs class indexes (0-6), and the class list saved with the model turns them back into names. That order must match the order used in training. If it shifts, every label is wrong while confidence still looks normal.
+7. Check storage and queries. Is the right row written for the right tile hash, are the probabilities stored correctly, and does the query filter what the analyst thinks it does?
+8. Check the environment. Did a library version change (Pillow, torchvision, scikit-learn)?
+
+Once I find the cause, I fix it and add a test that would have caught it, for example asserting that the API and evaluate.py give identical probabilities for the same tile.
+
+
+4. What's the weakest part of your design, and what would break it first?
+
+- I can't see when the model is wrong in production. Some errors are confidently wrong, and the model is forced to choose one of the 7 classes even for tiles it has never seen anything like (clouds, bare soil, a different sensor). These get a label, sometimes with high confidence, and go straight to auto_accepted. The threshold itself was also chosen from only 210 tiles.
+
+- A change in the input data would break it first: a new region, season or sensor, or multispectral/SAR tiles. Accuracy would drop quietly while the service reports healthy. The canary set wouldn't catch it either, because the canary tiles haven't changed.
+
+Mitigations: watch the review rate and class distribution for drift, spot-check auto-accepted tiles, add an out-of-distribution check (for example, how far a tile's features are from the training data), and validate tile format and bands strictly at ingest.
+
+- On the systems side, volume would break it next: the endpoint is synchronous, SQLite allows one writer at a time, and storing every raw tile will fill the disk. Batching, a work queue and a retention policy would address these.
