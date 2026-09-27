@@ -164,3 +164,8 @@ curl http://127.0.0.1:8000/stats
 | Drift monitoring and scheduled canary checks | Not built (described in Part 3) |
 | Model rollout and re-classification of old tiles | Not built |
 | Dataset path as a command-line argument | Not built (edit `BASE_DIR`) |
+
+
+## Use of AI tools
+
+I used Claude (Anthropic) code building and documentation improvements (README, design note and Part 3). I reviewed, ran and modified all of the code myself, verified the results on the eval set, and can explain and change any part of it.
